@@ -1,6 +1,6 @@
 ---
 name: voice
-description: Toggle voice mode. When ON, every assistant response silently writes a short spoken version to /tmp/claude_speak.txt for a Stop hook to play via TTS. Supports replay of the most recent spoken response without re-calling the API, and immediate interruption of in-progress playback. On first invocation, walks the user through installing the required Stop hook into their Claude settings and (optionally) storing an OpenAI API key. Use when the user invokes /voice, /voice on, /voice off, /voice status, /voice replay, or /voice stop.
+description: Toggle voice mode. When ON, every assistant response silently writes a short spoken version to /tmp/claude_speak.txt for a Stop hook to play via TTS. Supports repeating the most recent spoken response without re-calling the API, and immediate interruption of in-progress playback. On first invocation, walks the user through installing the required Stop hook into their Claude settings and (optionally) storing an OpenAI API key. Use when the user invokes /voice, /voice on, /voice off, /voice status, /voice repeat, or /voice stop.
 ---
 
 # Voice Mode
@@ -88,10 +88,10 @@ Look at the argument the user passed:
 - **`on`** (or no argument) → turn voice mode ON
 - **`off`** → turn voice mode OFF
 - **`status`** → report whether voice mode is currently active in this conversation
-- **`replay`** → replay the most recent spoken response from cached audio (no API call, no cost). See the Replay section below.
+- **`repeat`** → repeat the most recent spoken response from cached audio (no API call, no cost). See the Repeat section below.
 - **`stop`** → immediately kill any in-progress audio playback. See the Stop playback section below.
 
-Acknowledge the toggle in **one short sentence** (e.g. "Voice mode on.", "Voice mode off.", "Replaying.", "Audio stopped."). Do not produce a spoken summary for the acknowledgment itself.
+Acknowledge the toggle in **one short sentence** (e.g. "Voice mode on.", "Voice mode off.", "Repeating.", "Audio stopped."). Do not produce a spoken summary for the acknowledgment itself.
 
 ---
 
@@ -143,11 +143,11 @@ Stop writing to `/tmp/claude_speak.txt`. Respond normally per the default style 
 
 ---
 
-## Replay
+## Repeat
 
-If the user invokes `/voice replay`, replay the most recent spoken response from the cached audio — **no new API call, no cost**.
+If the user invokes `/voice repeat`, repeat the most recent spoken response from the cached audio — **no new API call, no cost**.
 
-The playback script caches each successful response to `/tmp/claude_speak_last.mp3` (OpenAI-generated) and `/tmp/claude_speak_last.txt` (the source text). Replay this cache directly using the Bash tool:
+The playback script caches each successful response to `/tmp/claude_speak_last.mp3` (OpenAI-generated) and `/tmp/claude_speak_last.txt` (the source text). Play this cache directly using the Bash tool:
 
 ```bash
 if [ -s /tmp/claude_speak_last.mp3 ]; then
@@ -163,11 +163,11 @@ fi
 
 Based on the output, respond with **one short sentence**:
 
-- `replay_mp3` → "Replaying."
-- `replay_say` → "Replaying with the fallback voice."
-- `replay_none` → "Nothing to replay yet."
+- `replay_mp3` → "Repeating."
+- `replay_say` → "Repeating with the fallback voice."
+- `replay_none` → "Nothing to repeat yet."
 
-**Important:** On a replay turn, **do not** write anything to `/tmp/claude_speak.txt`, even if voice mode is ON. Writing to that file would cause the Stop hook to make a brand-new OpenAI API call when your response ends, which is exactly what replay is meant to avoid. The user just wants to re-hear what they already heard — your acknowledgment sentence does not need to be spoken.
+**Important:** On a repeat turn, **do not** write anything to `/tmp/claude_speak.txt`, even if voice mode is ON. Writing to that file would cause the Stop hook to make a brand-new OpenAI API call when your response ends, which is exactly what repeat is meant to avoid. The user just wants to re-hear what they already heard — your acknowledgment sentence does not need to be spoken.
 
 ---
 

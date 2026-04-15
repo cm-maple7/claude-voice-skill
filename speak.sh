@@ -2,7 +2,7 @@
 # OpenAI TTS playback for Claude Code voice mode.
 # Reads /tmp/claude_speak.txt, synthesizes with OpenAI, plays via afplay.
 # Caches the most recent playback to /tmp/claude_speak_last.{mp3,txt}
-# so that `/voice replay` can re-play it without another API call.
+# so that `/voice repeat` can re-play it without another API call.
 
 FILE=/tmp/claude_speak.txt
 LOG=/tmp/claude_speak.log
