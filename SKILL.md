@@ -1,6 +1,6 @@
 ---
 name: voice
-description: Toggle voice mode. When ON, every assistant response silently writes a short spoken version to /tmp/claude_speak.txt for a Stop hook to play via TTS. Supports replay of the most recent spoken response without re-calling the API. On first invocation, walks the user through installing the required Stop hook into their Claude settings and (optionally) storing an OpenAI API key. Use when the user invokes /voice, /voice on, /voice off, /voice status, or /voice replay.
+description: Toggle voice mode. When ON, every assistant response silently writes a short spoken version to /tmp/claude_speak.txt for a Stop hook to play via TTS. Supports replay of the most recent spoken response without re-calling the API, and immediate interruption of in-progress playback. On first invocation, walks the user through installing the required Stop hook into their Claude settings and (optionally) storing an OpenAI API key. Use when the user invokes /voice, /voice on, /voice off, /voice status, /voice replay, or /voice stop.
 ---
 
 # Voice Mode
@@ -89,8 +89,9 @@ Look at the argument the user passed:
 - **`off`** → turn voice mode OFF
 - **`status`** → report whether voice mode is currently active in this conversation
 - **`replay`** → replay the most recent spoken response from cached audio (no API call, no cost). See the Replay section below.
+- **`stop`** → immediately kill any in-progress audio playback. See the Stop playback section below.
 
-Acknowledge the toggle in **one short sentence** (e.g. "Voice mode on.", "Voice mode off.", "Replaying."). Do not produce a spoken summary for the acknowledgment itself.
+Acknowledge the toggle in **one short sentence** (e.g. "Voice mode on.", "Voice mode off.", "Replaying.", "Audio stopped."). Do not produce a spoken summary for the acknowledgment itself.
 
 ---
 
@@ -167,6 +168,31 @@ Based on the output, respond with **one short sentence**:
 - `replay_none` → "Nothing to replay yet."
 
 **Important:** On a replay turn, **do not** write anything to `/tmp/claude_speak.txt`, even if voice mode is ON. Writing to that file would cause the Stop hook to make a brand-new OpenAI API call when your response ends, which is exactly what replay is meant to avoid. The user just wants to re-hear what they already heard — your acknowledgment sentence does not need to be spoken.
+
+---
+
+## Stop playback
+
+If the user invokes `/voice stop`, immediately kill any in-progress audio. This covers both the OpenAI path (`afplay` playing an MP3) and the macOS fallback (`say`).
+
+Run this Bash command:
+
+```bash
+pkill -x afplay 2>/dev/null; a=$?
+pkill -x say 2>/dev/null; s=$?
+if [ "$a" -eq 0 ] || [ "$s" -eq 0 ]; then
+  echo "stopped"
+else
+  echo "nothing"
+fi
+```
+
+Based on the output, respond with **one short sentence**:
+
+- `stopped` → "Audio stopped."
+- `nothing` → "Nothing was playing."
+
+**Important:** On a stop turn, **do not** write anything to `/tmp/claude_speak.txt`, even if voice mode is ON. Writing to that file would queue up a brand-new response to be spoken the moment the Stop hook fires at the end of your turn — immediately undoing the thing the user just asked for. The acknowledgment does not need to be spoken.
 
 ---
 

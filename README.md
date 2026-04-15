@@ -28,6 +28,7 @@ After setup, **restart your Claude Code session once** so it picks up the new ho
 - `/voice off` — turn it off
 - `/voice status` — check whether it's currently active
 - `/voice replay` — replay the most recent spoken response from cached audio (no API call, no cost)
+- `/voice stop` — immediately kill any in-progress audio playback
 
 Voice mode does **not** persist across conversations. You invoke `/voice on` at the start of each session you want spoken.
 
