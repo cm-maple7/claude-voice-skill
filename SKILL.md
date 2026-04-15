@@ -1,11 +1,89 @@
 ---
 name: voice
-description: Toggle voice mode. When ON, every assistant response silently writes a short spoken version to /tmp/claude_speak.txt for a Stop hook to play via TTS. Use when the user invokes /voice, /voice on, /voice off, or /voice status.
+description: Toggle voice mode. When ON, every assistant response silently writes a short spoken version to /tmp/claude_speak.txt for a Stop hook to play via TTS. On first invocation, walks the user through installing the required Stop hook into their Claude settings and (optionally) storing an OpenAI API key. Use when the user invokes /voice, /voice on, /voice off, or /voice status.
 ---
 
 # Voice Mode
 
-The user has invoked `/voice`. Look at the argument they passed:
+The user has invoked `/voice`.
+
+## Step 0 — First-run install check
+
+Before acting on the toggle, verify the skill is installed. Read `~/.claude/settings.json` and look in `hooks.Stop` for any command referencing `speak.sh`.
+
+- **If found** → the skill is already installed. Skip directly to the toggle logic below.
+- **If not found** → this is first-run setup. Execute the install flow, then continue to the toggle logic.
+
+### First-run install flow
+
+Tell the user in one short paragraph:
+
+> It looks like this is the first time you're using the voice skill. To make it work, I need to add a Stop hook to your Claude settings — it runs a small script (included with this skill) after each of my responses to synthesize and play speech. Optionally, I can also help you store an OpenAI API key for higher-quality TTS; without one, it falls back to the built-in macOS voice. Want me to proceed?
+
+Wait for confirmation. If the user declines, stop — do not toggle voice mode.
+
+If they confirm, do the following in order:
+
+**1. Verify the playback script exists.**
+
+The script is at `~/.claude/skills/voice/speak.sh` (the same directory as this `SKILL.md`, since the whole skill is cloned as a unit). Confirm the file is present. If it is missing, tell the user the repo may not have been cloned correctly into `~/.claude/skills/voice/` and stop.
+
+**2. Make it executable.**
+
+Run `chmod +x ~/.claude/skills/voice/speak.sh`.
+
+**3. Patch `~/.claude/settings.json` to add the Stop hook.**
+
+Read the file and parse it as JSON. Merge in a new Stop hook entry **without clobbering any existing config**:
+
+- If the top-level `hooks` key does not exist, create it.
+- If `hooks.Stop` does not exist, create it as an empty array.
+- Append this entry to `hooks.Stop`:
+
+```json
+{
+  "hooks": [
+    {
+      "type": "command",
+      "command": "nohup $HOME/.claude/skills/voice/speak.sh >/dev/null 2>&1 </dev/null &"
+    }
+  ]
+}
+```
+
+Write the file back. Prefer the Edit tool over Write when the file already has content, to minimize the risk of clobbering existing formatting or keys.
+
+**4. Offer to set up an OpenAI API key.**
+
+First check whether a key is already stored: run `security find-generic-password -s "openai_api_key" -w 2>/dev/null`. If it returns a non-empty value, skip this step entirely.
+
+Otherwise, present these three options to the user:
+
+> The playback script can use an OpenAI API key for high-quality TTS (roughly a tenth of a cent per response). Without a key, it falls back to the built-in macOS voice — free, but more robotic. Three options:
+>
+> 1. **Paste the key here** — I'll store it in your macOS Keychain. Note: the key will be visible in this conversation.
+> 2. **Add it yourself in your own terminal** (safer). I'll give you the exact one-line command to run.
+> 3. **Skip** — use the macOS fallback voice for now. You can add a key later.
+
+Handle the response:
+
+- **Option 1**: Run `security add-generic-password -s "openai_api_key" -a "$USER" -w "<KEY>" -U` with the key they provided. The `-U` flag updates if the entry exists. Confirm success in one line.
+- **Option 2**: Print the exact command for them to run: `security add-generic-password -s "openai_api_key" -a "$USER" -w "sk-YOUR-KEY-HERE" -U`. Tell them to replace the placeholder and run it in their own terminal.
+- **Option 3**: Tell them briefly that they can add a key later using the same command from Option 2.
+
+**5. Confirm install is done.**
+
+Tell the user, in one short paragraph:
+
+> Voice skill installed. The Stop hook is now in your Claude settings. Heads up: Claude Code reads hooks at the start of a session, so you will probably need to restart this Claude Code session once for the hook to take effect. After that, voice mode will play audio automatically.
+
+Then proceed to the toggle logic below.
+
+---
+
+## Toggle logic
+
+Look at the argument the user passed:
 
 - **`on`** (or no argument) → turn voice mode ON
 - **`off`** → turn voice mode OFF
