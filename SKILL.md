@@ -1,6 +1,6 @@
 ---
 name: voice
-description: Toggle voice mode. When ON, every assistant response silently writes a short spoken version to /tmp/claude_speak.txt for a Stop hook to play via TTS. On first invocation, walks the user through installing the required Stop hook into their Claude settings and (optionally) storing an OpenAI API key. Use when the user invokes /voice, /voice on, /voice off, or /voice status.
+description: Toggle voice mode. When ON, every assistant response silently writes a short spoken version to /tmp/claude_speak.txt for a Stop hook to play via TTS. Supports replay of the most recent spoken response without re-calling the API. On first invocation, walks the user through installing the required Stop hook into their Claude settings and (optionally) storing an OpenAI API key. Use when the user invokes /voice, /voice on, /voice off, /voice status, or /voice replay.
 ---
 
 # Voice Mode
@@ -88,8 +88,9 @@ Look at the argument the user passed:
 - **`on`** (or no argument) → turn voice mode ON
 - **`off`** → turn voice mode OFF
 - **`status`** → report whether voice mode is currently active in this conversation
+- **`replay`** → replay the most recent spoken response from cached audio (no API call, no cost). See the Replay section below.
 
-Acknowledge the toggle in **one short sentence** (e.g. "Voice mode on." or "Voice mode off."). Do not produce a spoken summary for the acknowledgment itself.
+Acknowledge the toggle in **one short sentence** (e.g. "Voice mode on.", "Voice mode off.", "Replaying."). Do not produce a spoken summary for the acknowledgment itself.
 
 ---
 
@@ -138,6 +139,34 @@ State the answer. Stop. Do not pad to feel complete.
 ## When voice mode is OFF
 
 Stop writing to `/tmp/claude_speak.txt`. Respond normally per the default style guidelines.
+
+---
+
+## Replay
+
+If the user invokes `/voice replay`, replay the most recent spoken response from the cached audio — **no new API call, no cost**.
+
+The playback script caches each successful response to `/tmp/claude_speak_last.mp3` (OpenAI-generated) and `/tmp/claude_speak_last.txt` (the source text). Replay this cache directly using the Bash tool:
+
+```bash
+if [ -s /tmp/claude_speak_last.mp3 ]; then
+  (nohup afplay /tmp/claude_speak_last.mp3 >/dev/null 2>&1 &)
+  echo "replay_mp3"
+elif [ -s /tmp/claude_speak_last.txt ]; then
+  (nohup say -v "Ava (Premium)" -r 200 -f /tmp/claude_speak_last.txt >/dev/null 2>&1 &)
+  echo "replay_say"
+else
+  echo "replay_none"
+fi
+```
+
+Based on the output, respond with **one short sentence**:
+
+- `replay_mp3` → "Replaying."
+- `replay_say` → "Replaying with the fallback voice."
+- `replay_none` → "Nothing to replay yet."
+
+**Important:** On a replay turn, **do not** write anything to `/tmp/claude_speak.txt`, even if voice mode is ON. Writing to that file would cause the Stop hook to make a brand-new OpenAI API call when your response ends, which is exactly what replay is meant to avoid. The user just wants to re-hear what they already heard — your acknowledgment sentence does not need to be spoken.
 
 ---
 

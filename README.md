@@ -27,8 +27,13 @@ After setup, **restart your Claude Code session once** so it picks up the new ho
 - `/voice on` — turn voice mode on for the rest of the conversation
 - `/voice off` — turn it off
 - `/voice status` — check whether it's currently active
+- `/voice replay` — replay the most recent spoken response from cached audio (no API call, no cost)
 
 Voice mode does **not** persist across conversations. You invoke `/voice on` at the start of each session you want spoken.
+
+### Replay
+
+If you miss what was said, `/voice replay` re-plays the last response from a cached MP3 in `/tmp` — no new OpenAI request. Only the most recent response is cached; the cache is cleared on reboot.
 
 ## Requirements
 
