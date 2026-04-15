@@ -4,6 +4,14 @@ A `/voice` slash command for [Claude Code](https://claude.com/claude-code) that 
 
 When voice mode is on, Claude silently writes a short spoken version of each response to a temp file. A Stop hook then reads that file, synthesizes speech, and plays it through `afplay`. You never see the spoken text in chat — just hear it.
 
+## Pair it with a dictation app for full voice chat
+
+This skill only handles the **assistant side** of a voice conversation — text-to-speech for Claude's responses. To close the loop and actually talk to Claude hands-free, pair it with a dictation app that handles speech-to-text on your side.
+
+I use [Wispr Flow](https://wisprflow.ai/) — I dictate into the Claude Code input, Claude speaks the reply back through this skill, and I keep going. Any system-wide dictation tool works (macOS built-in dictation, [Whisper](https://github.com/openai/whisper)-based tools, etc.), but Wispr Flow is where this setup really shines.
+
+Put another way: this skill alone is one-way. The skill plus a dictation app is the actual "voice mode" experience.
+
 ## Install
 
 One command:
