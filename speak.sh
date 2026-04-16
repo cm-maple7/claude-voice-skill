@@ -1,6 +1,8 @@
 #!/bin/bash
 # OpenAI TTS playback for Claude Code voice mode.
 # Reads /tmp/claude_speak.txt, synthesizes with OpenAI, plays via afplay.
+# Uses a lock directory to queue concurrent invocations — if audio is
+# already playing, the next invocation waits for it to finish.
 # Caches the most recent playback to /tmp/claude_speak_last.{mp3,txt}
 # so that `/voice repeat` can re-play it without another API call.
 
@@ -8,6 +10,8 @@ FILE=/tmp/claude_speak.txt
 LOG=/tmp/claude_speak.log
 LAST_MP3=/tmp/claude_speak_last.mp3
 LAST_TXT=/tmp/claude_speak_last.txt
+LOCKDIR=/tmp/claude_speak.lockdir
+STOP=/tmp/claude_speak.stop
 
 [ -f "$FILE" ] || exit 0
 
@@ -21,6 +25,19 @@ fi
 TEXT=$(cat "$CLAIM")
 if [ -z "$TEXT" ]; then
   rm -f "$CLAIM"
+  exit 0
+fi
+
+# Wait for any currently-playing instance to finish
+while ! mkdir "$LOCKDIR" 2>/dev/null; do
+  sleep 0.2
+done
+trap 'rmdir "$LOCKDIR" 2>/dev/null' EXIT
+
+# If /voice stop was called, abort
+if [ -f "$STOP" ]; then
+  rm -f "$STOP" "$CLAIM"
+  echo "$(date): aborted by stop flag (pid $$)" >> "$LOG"
   exit 0
 fi
 

@@ -9,7 +9,7 @@ The user has invoked `/voice`.
 
 ## Step 0 — First-run install check
 
-Before acting on the toggle, verify the skill is installed. Read `~/.claude/settings.json` and look in `hooks.Stop` for any command referencing `speak.sh`.
+Before acting on the toggle, verify the skill is installed. Read `~/.claude/settings.json` and look in `hooks.Stop` or `hooks.PostToolUse` for any command referencing `speak.sh`.
 
 - **If found** → the skill is already installed. Skip directly to the toggle logic below.
 - **If not found** → this is first-run setup. Execute the install flow, then continue to the toggle logic.
@@ -32,13 +32,26 @@ The script is at `~/.claude/skills/voice/speak.sh` (the same directory as this `
 
 Run `chmod +x ~/.claude/skills/voice/speak.sh`.
 
-**3. Patch `~/.claude/settings.json` to add the Stop hook.**
+**3. Patch `~/.claude/settings.json` to add the hooks.**
 
-Read the file and parse it as JSON. Merge in a new Stop hook entry **without clobbering any existing config**:
+Read the file and parse it as JSON. Merge in two hook entries **without clobbering any existing config**:
 
 - If the top-level `hooks` key does not exist, create it.
-- If `hooks.Stop` does not exist, create it as an empty array.
-- Append this entry to `hooks.Stop`:
+- If `hooks.PostToolUse` does not exist, create it as an empty array. Append this entry (the `matcher` ensures it only fires after Write tool calls):
+
+```json
+{
+  "matcher": "Write",
+  "hooks": [
+    {
+      "type": "command",
+      "command": "nohup $HOME/.claude/skills/voice/speak.sh >/dev/null 2>&1 </dev/null &"
+    }
+  ]
+}
+```
+
+- If `hooks.Stop` does not exist, create it as an empty array. Append this entry (acts as a fallback in case the PostToolUse hook misses anything):
 
 ```json
 {
@@ -50,6 +63,8 @@ Read the file and parse it as JSON. Merge in a new Stop hook entry **without clo
   ]
 }
 ```
+
+The PostToolUse hook is the primary trigger — it fires immediately after Claude writes the speech file, so playback starts mid-response instead of waiting for Claude to finish. The Stop hook is a safety net that catches anything the PostToolUse hook missed. The script's atomic claim mechanism prevents double-play if both hooks fire for the same file.
 
 Write the file back. Prefer the Edit tool over Write when the file already has content, to minimize the risk of clobbering existing formatting or keys.
 
@@ -107,7 +122,17 @@ Do this on every response while voice mode is ON, even short ones. The only exce
 
 ### Rules for the spoken text
 
-**Length — cut fluff, not substance.** Voice output will soon be going through a paid TTS API billed per character, and it is listened to in real time. Every wasted word costs money and wastes the user's attention. But "concise" does not mean "short regardless of the question" — it means the answer contains no filler. A genuinely complex answer is allowed to be long if the length is doing real work. A simple answer must not be padded to sound thorough.
+**Conversational flow — one topic at a time.** When voice mode is on, the user is in a dialogue — they hear your response and speak their reply. Multi-topic responses force them to mentally juggle several threads and compose a verbal answer covering all of them at once. That doesn't work.
+
+This rule applies to both the on-screen response AND the spoken text:
+
+- Address one topic, question, or decision per response. If the user's prompt touches multiple things, handle the most important or most blocking one first. You will get to the rest in subsequent turns.
+- Do not present multiple options and ask the user to choose among them. State your recommendation and why, then ask if they want something different.
+- Keep responses short enough that the user can hold the whole thing in working memory and respond to it verbally.
+
+This does not mean withhold information or be unhelpfully terse. If a single topic genuinely requires depth, give it depth. The rule is about breadth, not depth: one thing thoroughly, not four things shallowly.
+
+**Length — cut fluff, not substance.** Voice output is going through a paid TTS API billed per character, and it is listened to in real time. Every wasted word costs money and wastes the user's attention. But "concise" does not mean "short regardless of the question" — it means the answer contains no filler. A genuinely complex answer is allowed to be long if the length is doing real work. A simple answer must not be padded to sound thorough.
 
 The test for every sentence: **does cutting this sentence lose information the listener actually needs?** If no, cut it. Apply that test one sentence at a time until every remaining sentence earns its place.
 
@@ -178,6 +203,8 @@ If the user invokes `/voice stop`, immediately kill any in-progress audio. This 
 Run this Bash command:
 
 ```bash
+touch /tmp/claude_speak.stop
+rm -f /tmp/claude_speak.txt
 pkill -x afplay 2>/dev/null; a=$?
 pkill -x say 2>/dev/null; s=$?
 if [ "$a" -eq 0 ] || [ "$s" -eq 0 ]; then
@@ -186,6 +213,8 @@ else
   echo "nothing"
 fi
 ```
+
+The stop flag (`/tmp/claude_speak.stop`) tells any queued instance of `speak.sh` to abort instead of playing. The script checks for this flag after acquiring the playback lock. Removing the pending text file prevents any unclaimed speech from being picked up.
 
 Based on the output, respond with **one short sentence**:
 

@@ -53,8 +53,8 @@ If you miss what was said, `/voice repeat` re-plays the last response from a cac
 ## How it works
 
 1. When voice is on, Claude writes a short spoken version of each response to `/tmp/claude_speak.txt` (in addition to the normal on-screen response).
-2. When Claude's turn ends, the Stop hook runs [`speak.sh`](speak.sh) in the background.
-3. `speak.sh` atomically claims the file, reads your OpenAI key from Keychain via `security find-generic-password`, POSTs to `https://api.openai.com/v1/audio/speech`, and plays the resulting MP3 via `afplay`.
+2. A `PostToolUse` hook fires immediately after the Write, running [`speak.sh`](speak.sh) in the background — so playback starts mid-response instead of waiting for Claude to finish. A `Stop` hook also runs at the end as a fallback.
+3. `speak.sh` atomically claims the file, acquires a playback lock (queuing behind any currently-playing audio), reads your OpenAI key from Keychain via `security find-generic-password`, POSTs to `https://api.openai.com/v1/audio/speech`, and plays the resulting MP3 via `afplay`.
 4. If the key is missing or the API call fails, it falls back to `say -v "Ava (Premium)"`.
 
 Logs are written to `/tmp/claude_speak.log` if you want to debug.
@@ -87,11 +87,22 @@ OpenAI `tts-1` is billed per character. The skill instructs Claude to aggressive
 If for some reason Claude can't complete the auto-install, you can do it by hand:
 
 1. Make the script executable: `chmod +x ~/.claude/skills/voice/speak.sh`
-2. Add this block to `~/.claude/settings.json` under `hooks`:
+2. Add these hooks to `~/.claude/settings.json` under `hooks`:
 
    ```json
    {
      "hooks": {
+       "PostToolUse": [
+         {
+           "matcher": "Write",
+           "hooks": [
+             {
+               "type": "command",
+               "command": "nohup $HOME/.claude/skills/voice/speak.sh >/dev/null 2>&1 </dev/null &"
+             }
+           ]
+         }
+       ],
        "Stop": [
          {
            "hooks": [
